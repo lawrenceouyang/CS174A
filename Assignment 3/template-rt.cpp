@@ -11,6 +11,8 @@
 #include <vector>
 #include <math.h>
 #include <algorithm>
+#include <climits>
+#include <typeinfo>
 using namespace std;
 
 int g_width;
@@ -33,6 +35,9 @@ struct Sphere
 	float Ka;		float Kd;		float Ks;		float Kr;
 	float n;
 	mat4 inverse;
+
+	Sphere() 
+	{};
 
 	Sphere(float x, float y, float z, float sX, float sY, float sZ, 
 		   float cR, float cG, float cB, float a, float d, float s, float r, float initN)
@@ -164,12 +169,7 @@ void setColor(int ix, int iy, const vec4& color)
 // -------------------------------------------------------------------
 // Intersection routine
 
-// TODO: add your ray-sphere intersection routine here.
-
-
-// -------------------------------------------------------------------
-// Ray tracing
-
+// Solve the quadratic to find the intersection time.
 bool solveQuad(Ray ray, float& t)
 {
 	float originDot = dot(toVec3(ray.origin), toVec3(ray.origin));
@@ -184,28 +184,60 @@ bool solveQuad(Ray ray, float& t)
 	else
 		ans = min( -(originDirDot/dirDot) + sqrt(det)/dirDot,
 		     	   -(originDirDot/dirDot) - sqrt(det)/dirDot );
-	if (t == 0)
-		t = ans;
 	
-	if (t < ans)
+	if (t < ans || ans < 1)
 		return false;
 	
 	t = ans;
 	return true;
 }
 
+// -------------------------------------------------------------------
+// Ray tracing
+
+// Build Color Model
+
+// Add diffuse light
+// vec4addDiffuse(Sphere sphere, float t)
+// {
+// 	for (int i = 0; i < g_light.size(); i++) {
+
+// 	}
+// }
+
+
+// Add ambient light to formula
+vec4 addAmbient(Sphere *sphere)
+{
+	return vec4(sphere->colR*g_amIntesity[0]*sphere->Ka, 
+				sphere->colG*g_amIntesity[1]*sphere->Ka, 
+				sphere->colB*g_amIntesity[2]*sphere->Ka, 1.0f);
+}
+
 vec4 trace(const Ray& ray)
 {
     // TODO: implement your ray tracing routine here.
 	vec4 retVec = g_bgColor;
-	for (int i = 0; i < g_sphere.size(); i++){
+	Sphere *closeSphere;
+	Ray closeInvRay;
+	float t = FLT_MAX;
+
+	for (int i = 0; i < g_sphere.size(); i++) {
 		Ray invRay;
 		invRay.origin = g_sphere[i].inverse*ray.origin;
 		invRay.dir 	  = g_sphere[i].inverse*ray.dir;
-		float t = 0;
-		if(solveQuad(invRay, t))
-			retVec = vec4(g_sphere[i].colR, g_sphere[i].colG, g_sphere[i].colB, 1.0f);
+		if (solveQuad(invRay, t)) {
+				cout << t << endl;
+				closeSphere = &g_sphere[i];
+				closeInvRay = invRay;
+			}
+		}
+
+	if (closeSphere) {
+		vec4 p = closeInvRay.origin;
+		retVec = addAmbient(closeSphere);// + addDiffuse(g_sphere[i], t);	
 	}
+
 	return retVec;
 } 
 
@@ -217,8 +249,7 @@ vec4 getDir(int ix, int iy)
     vec4 dir;
     dir = vec4((g_left + ((float)ix/g_width)*(g_right - g_left)), 
     		   (g_bottom + ((float)iy/g_height)*(g_top - g_bottom)), -g_near, 0.0f);
-    //cout << dir[0] << " " << dir[1] << " " << dir[2] << " " << dir[3] << endl;
-    return dir;
+    return normalize(dir);
 }
 
 void renderPixel(int ix, int iy)
