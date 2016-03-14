@@ -218,7 +218,7 @@ vec4 trace(const Ray& ray)
 {
     // TODO: implement your ray tracing routine here.
 	vec4 retVec = g_bgColor;
-	Sphere *closeSphere;
+	Sphere *closeSphere = nullptr;
 	Ray closeInvRay;
 	float t = FLT_MAX;
 
@@ -227,7 +227,6 @@ vec4 trace(const Ray& ray)
 		invRay.origin = g_sphere[i].inverse*ray.origin;
 		invRay.dir 	  = g_sphere[i].inverse*ray.dir;
 		if (solveQuad(invRay, t)) {
-				cout << t << endl;
 				closeSphere = &g_sphere[i];
 				closeInvRay = invRay;
 			}

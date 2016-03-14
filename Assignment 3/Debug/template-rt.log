@@ -1,0 +1,4 @@
+﻿  template-rt.cpp
+c:\users\lawre\onedrive\ucla\cs174a\assignment 3\template-rt.cpp(225): warning C4018: '<': signed/unsigned mismatch
+template-rt.obj : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/SAFESEH' specification
+  template-rt.vcxproj -> C:\Users\lawre\OneDrive\UCLA\CS174A\Assignment 3\Debug\template-rt.exe
