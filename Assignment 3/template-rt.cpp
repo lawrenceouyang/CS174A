@@ -39,18 +39,20 @@ struct Sphere
 	Sphere() 
 	{};
 
-	Sphere(float x, float y, float z, float sX, float sY, float sZ, 
+	Sphere(string l, float x, float y, float z, float sX, float sY, float sZ, 
 		   float cR, float cG, float cB, float a, float d, float s, float r, float initN)
 	{
+		name = l;
 		posX = x;		posY = y;		posZ = z;
 		scaleX = sX;	scaleY = sY;	scaleZ = sZ;
 		colR = cR;		colG = cG;		colB = cB;
 		Ka = a;			Kd = d;			Ks = s;			Kr = r;
 		n = initN;
 
-		mat4 mTransform = mat4()*Translate(x, y, z)*Scale(scaleX, scaleY, scaleZ);
+		mat4 mTransform = Translate(x, y, z)*Scale(scaleX, scaleY, scaleZ);
 		InvertMatrix(mTransform, inverse);
 	}
+
 };
 
 struct Light 
@@ -59,8 +61,9 @@ struct Light
 	float posX;		float posY;		float posZ;
 	float intR;		float intG;		float intB;
 
-	Light(float x, float y, float z, float r, float g, float b)
+	Light(string l, float x, float y, float z, float r, float g, float b)
 	{
+		name = l;
 		posX = x; 	posY = y;	posZ = z;
 		intR = r;	intG = g;	intB = b;
 	}
@@ -117,12 +120,12 @@ void parseLine(const vector<string>& vs)
 					g_height = (int)toFloat(vs[2]); 
 					g_colors.resize(g_width * g_height);	break;
 
-		case 6:		g_sphere.push_back(Sphere(toFloat(vs[2]), toFloat(vs[3]), toFloat(vs[4]), toFloat(vs[5]),
+		case 6:		g_sphere.push_back(Sphere(vs[1], toFloat(vs[2]), toFloat(vs[3]), toFloat(vs[4]), toFloat(vs[5]),
 											  toFloat(vs[6]), toFloat(vs[7]), toFloat(vs[8]), toFloat(vs[9]), toFloat(vs[10]), 
 											  toFloat(vs[11]),toFloat(vs[12]), toFloat(vs[13]), toFloat(vs[14]), toFloat(vs[15]))); 	break;
 
-		case 7:		g_light.push_back(Light(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]), 
-											toFloat(vs[4]), toFloat(vs[5]), toFloat(vs[6]))); break;
+		case 7:		g_light.push_back(Light(vs[1], toFloat(vs[2]), toFloat(vs[3]), toFloat(vs[4]),
+											toFloat(vs[5]), toFloat(vs[6]), toFloat(vs[7]))); break;
 
 		case 8:		g_bgColor = vec4(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3]), 1);	break;
 		case 9:		g_amIntesity = vec3(toFloat(vs[1]), toFloat(vs[2]), toFloat(vs[3])); 	break;
@@ -185,8 +188,8 @@ bool solveQuad(Ray ray, float& t)
 		ans = min( -(originDirDot/dirDot) + sqrt(det)/dirDot,
 		     	   -(originDirDot/dirDot) - sqrt(det)/dirDot );
 	
-	if (t < ans || ans < 1)
-		return false;
+	// if (t < ans || ans < 1)
+	// 	return false;
 	
 	t = ans;
 	return true;
@@ -197,52 +200,129 @@ bool solveQuad(Ray ray, float& t)
 
 // Build Color Model
 
-// Add diffuse light
-// vec4addDiffuse(Sphere sphere, float t)
-// {
-// 	for (int i = 0; i < g_light.size(); i++) {
-
-// 	}
-// }
-
-
-// Add ambient light to formula
-vec4 addAmbient(Sphere *sphere)
+//Add diffuse light, specular light, and account for shadow
+vec4 addLight(Sphere *sphere, Ray ray, vec4 p, vec4 n)
 {
-	return vec4(sphere->colR*g_amIntesity[0]*sphere->Ka, 
-				sphere->colG*g_amIntesity[1]*sphere->Ka, 
-				sphere->colB*g_amIntesity[2]*sphere->Ka, 1.0f);
+	vec4 retVec = vec4();
+	
+	for (int i = 0; i < g_light.size(); i++) {
+		bool shadow = false;
+		Ray lightRay;
+		lightRay.origin = vec4(g_light[i].posX, g_light[i].posY, g_light[i].posZ, 1.0f);
+		lightRay.dir = lightRay.origin - p;
+
+		//calculate L dot n for diffuse light
+		float lightAngle = dot(normalize(lightRay.dir), n);
+		if (lightAngle < 0) continue;
+		
+		//calculate r dot v for specular light
+		vec4 r = 2 * lightAngle * n - normalize(lightRay.dir);
+		vec4 v = ray.origin - p;
+		float specularAngle = dot(normalize(r), normalize(v));
+		specularAngle = pow(specularAngle, sphere->n);
+
+		float t = 0;
+
+		//check for intersection with another sphere for shadow
+		for (int j = 0; j < g_sphere.size(); j++) {
+		
+			if (g_sphere[j].name == sphere->name) continue;
+
+			Ray invLightRay;
+			invLightRay.origin = g_sphere[j].inverse * lightRay.origin;
+			invLightRay.dir    = g_sphere[j].inverse * lightRay.dir;
+
+			// Check for shadow. If there is a block ignore all light contribution.
+			if (solveQuad(invLightRay, t)) {
+				if (abs(t) > 0.0001 && abs(t) <= 1) {
+					shadow = true;
+					break;
+				}
+			}
+		}
+
+		if (!shadow) {
+		// Add Diffuse
+		retVec += vec4(g_light[i].intR * sphere->Kd * lightAngle * sphere->colR, 
+					   g_light[i].intG * sphere->Kd * lightAngle * sphere->colG,
+					   g_light[i].intB * sphere->Kd * lightAngle * sphere->colB, 0.0f);
+
+		// Add Specular
+		retVec += vec4(g_light[i].intR * sphere->Ks * specularAngle,
+					   g_light[i].intG * sphere->Ks * specularAngle,
+					   g_light[i].intB * sphere->Ks * specularAngle, 0.0f);
+		}
+	}
+
+	// Add Ambient
+	retVec += vec4(g_amIntesity[0] * sphere->Ka * sphere->colR,
+	  			   g_amIntesity[1] * sphere->Ka * sphere->colG, 
+				   g_amIntesity[2] * sphere->Ka * sphere->colB, 0.0f);
+
+	return retVec;
 }
 
-vec4 trace(const Ray& ray)
+vec4 trace(const Ray& ray, int it)
 {
     // TODO: implement your ray tracing routine here.
-	vec4 retVec = g_bgColor;
+
+	//Check level of recursion
+	if (it > 3) return vec4();
+
+	vec4 retVec;
+	//On extra levels of recursion, do not add background color
+	if (it < 1)  retVec = g_bgColor;
+	else retVec = vec4();	
 	Sphere *closeSphere = nullptr;
 	Ray closeInvRay;
 	float t = FLT_MAX;
+	float tMin = FLT_MAX;
 
 	for (int i = 0; i < g_sphere.size(); i++) {
 		Ray invRay;
-		invRay.origin = g_sphere[i].inverse*ray.origin;
-		invRay.dir 	  = g_sphere[i].inverse*ray.dir;
-		if (solveQuad(invRay, t)) {
+		invRay.origin = g_sphere[i].inverse * ray.origin;
+		invRay.dir 	  = g_sphere[i].inverse * ray.dir;
+		if (solveQuad(invRay, tMin)) {
+			if (tMin < t && tMin > 1) {
+				t = tMin;
 				closeSphere = &g_sphere[i];
 				closeInvRay = invRay;
 			}
 		}
-
-	if (closeSphere) {
-		vec4 p = closeInvRay.origin;
-		retVec = addAmbient(closeSphere);// + addDiffuse(g_sphere[i], t);	
 	}
 
+	if (closeSphere) {
+
+		// Calculate intersection point and normal
+		vec4 p = closeInvRay.origin + t * closeInvRay.dir;
+		vec4 n = transpose(closeSphere->inverse)*p;
+		n[3] = 0;
+		n = normalize(n);
+		vec4 pEye = ray.origin + t * ray.dir;
+
+		//Add ambient, diffuse, and specular light
+		retVec = addLight(closeSphere, ray, pEye, n);
+
+		// Calculate reflection ray
+		Ray reflectRay;
+		reflectRay.origin = pEye;
+		reflectRay.dir = normalize(-2*dot(n, ray.dir)*n + ray.dir);
+
+		// Add reflect light
+		retVec += closeSphere->Kr * trace(reflectRay, it+1);
+	}
+
+	// Cap values of color
+	if (retVec[0] > 1) retVec[0] = 1;
+	if (retVec[1] > 1) retVec[1] = 1;
+	if (retVec[2] > 1) retVec[2] = 1;
+	retVec[3] = 1.0f;
 	return retVec;
 } 
 
 vec4 getDir(int ix, int iy)
 {
-    // TODO: modify this. This should return the direction from the origin
+    // DONE. This should return the direction from the origin
     // to pixel (ix, iy), normalized.
 
     vec4 dir;
@@ -256,7 +336,7 @@ void renderPixel(int ix, int iy)
     Ray ray;
     ray.origin = vec4(0.0f, 0.0f, 0.0f, 1.0f);
     ray.dir = getDir(ix, iy);
-    vec4 color = trace(ray);
+    vec4 color = trace(ray, 0);
     setColor(ix, iy, color);
 }
 
