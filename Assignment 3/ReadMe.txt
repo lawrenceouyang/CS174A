@@ -1,16 +1,14 @@
 ========================================================================
     template-rt: Template for ray tracer
 ========================================================================
+Lawrence Ouyang
+504128219
+CS174A
 
-Contents of the project:
+Project 3: Raytracer
 
-- template-rt.cpp: main source file
-- matm.h: modified mat.h from Edward Angel. Code to invert a matrix 
-  was added there (function InvertMatrix).
-- vecm.h: modified vec.h from Edward Angel.
+All test cases that are in the specification were passed.
 
-You may modify template-rt.cpp as you wish.
 
-Look for comment lines starting with TODO. These are are important
-places where most of your code will be added.
+
 
