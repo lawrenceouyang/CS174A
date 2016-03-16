@@ -184,12 +184,9 @@ bool solveQuad(Ray ray, float& t)
 		return false;
 	else if(det == 0)
 		ans = -(originDirDot/dirDot);
-	else
+	else 
 		ans = min( -(originDirDot/dirDot) + sqrt(det)/dirDot,
 		     	   -(originDirDot/dirDot) - sqrt(det)/dirDot );
-	
-	// if (t < ans || ans < 1)
-	// 	return false;
 	
 	t = ans;
 	return true;
@@ -234,7 +231,7 @@ vec4 addLight(Sphere *sphere, Ray ray, vec4 p, vec4 n)
 
 			// Check for shadow. If there is a block ignore all light contribution.
 			if (solveQuad(invLightRay, t)) {
-				if (abs(t) > 0.0001 && abs(t) <= 1) {
+				if (abs(t) > 0.0001f && abs(t) <= 1) {
 					shadow = true;
 					break;
 				}
@@ -264,7 +261,7 @@ vec4 addLight(Sphere *sphere, Ray ray, vec4 p, vec4 n)
 
 vec4 trace(const Ray& ray, int it)
 {
-    // TODO: implement your ray tracing routine here.
+    // DONE: implement your ray tracing routine here.
 
 	//Check level of recursion
 	if (it > 3) return vec4();
@@ -283,7 +280,7 @@ vec4 trace(const Ray& ray, int it)
 		invRay.origin = g_sphere[i].inverse * ray.origin;
 		invRay.dir 	  = g_sphere[i].inverse * ray.dir;
 		if (solveQuad(invRay, tMin)) {
-			if (tMin < t && tMin > 1) {
+			if (tMin < t && tMin > 0.0001f) {
 				t = tMin;
 				closeSphere = &g_sphere[i];
 				closeInvRay = invRay;
@@ -295,10 +292,11 @@ vec4 trace(const Ray& ray, int it)
 
 		// Calculate intersection point and normal
 		vec4 p = closeInvRay.origin + t * closeInvRay.dir;
+		vec4 pEye = ray.origin + t * ray.dir;
+		
 		vec4 n = transpose(closeSphere->inverse)*p;
 		n[3] = 0;
 		n = normalize(n);
-		vec4 pEye = ray.origin + t * ray.dir;
 
 		//Add ambient, diffuse, and specular light
 		retVec = addLight(closeSphere, ray, pEye, n);
@@ -312,7 +310,7 @@ vec4 trace(const Ray& ray, int it)
 		retVec += closeSphere->Kr * trace(reflectRay, it+1);
 	}
 
-	// Cap values of color
+    // Done: clamp values if out of range.
 	if (retVec[0] > 1) retVec[0] = 1;
 	if (retVec[1] > 1) retVec[1] = 1;
 	if (retVec[2] > 1) retVec[2] = 1;
@@ -373,18 +371,25 @@ void savePPM(int Width, int Height, char* fname, unsigned char* pixels)
     fclose(fp);
 }
 
-void saveFile()
+void saveFile(const char* filename)
 {
     // Convert color components from floats to unsigned chars.
-    // TODO: clamp values if out of range.
     unsigned char* buf = new unsigned char[g_width * g_height * 3];
     for (int y = 0; y < g_height; y++)
         for (int x = 0; x < g_width; x++)
             for (int i = 0; i < 3; i++)
                 buf[y*g_width*3+x*3+i] = (unsigned char)(((float*)g_colors[y*g_width+x])[i] * 255.9f);
     
-    // TODO: change file name based on input file name.
-    savePPM(g_width, g_height, "output.ppm", buf);
+    // Done: change file name based on input file name.
+    string outputName = filename;
+    outputName[outputName.size() - 1] = 'm';
+    outputName[outputName.size() - 2] = 'p';
+    outputName[outputName.size() - 3] = 'p';
+    const char* temp = outputName.c_str();
+    char* output = new char[outputName.size()];
+    strcpy(output, temp);
+    savePPM(g_width, g_height, output, buf);
+    delete[] output;
     delete[] buf;
 }
 
@@ -401,7 +406,7 @@ int main(int argc, char* argv[])
     }
     loadFile(argv[1]);
     render();
-    saveFile();
+    saveFile(argv[1]);
 	return 0;
 }
 
